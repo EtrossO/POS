@@ -84,9 +84,10 @@ const Reports: React.FC<ReportsProps> = ({ sales: propSales }) => {
     }
 
     const headers = ["ID", "Timestamp", "Customer Name", "Quantity", "Total Price (RM)", "Payment Method", "Promos"];
+    
     const rows = filteredSales.map(s => [
       s.id,
-      new Date(s.timestamp).toLocaleString(),
+      new Date(s.timestamp),
       s.customerName,
       s.quantity,
       s.totalPrice.toFixed(2),
@@ -94,7 +95,19 @@ const Reports: React.FC<ReportsProps> = ({ sales: propSales }) => {
       s.appliedPromos.join('; ')
     ]);
 
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    //function to escape CSV values
+    const escapeCSV = (value: any): string => {
+      if (value == null) return '';
+      const str = value.toString();
+      if (str.includes('"') || str.includes(',') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`; //escape quotes
+      }
+      return str;
+    }
+
+    const csvContent = [headers, ...rows]
+    .map(e => e.map(escapeCSV).join(","))
+    .join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
