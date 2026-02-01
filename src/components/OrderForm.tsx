@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Package, User, ShoppingBag, CreditCard, Wallet, CheckCircle, Tag } from 'lucide-react';
 import { PromoRule, PaymentMethod, Sale } from '../types';
 import { calculatePrice } from '../utils/pricing';
+import { addSale } from '../salesService';
 
 interface OrderFormProps {
   promos: PromoRule[];
@@ -15,15 +15,18 @@ const OrderForm: React.FC<OrderFormProps> = ({ promos, basePrice, onAddSale }) =
   const [quantity, setQuantity] = useState<number>(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
   const [pricingInfo, setPricingInfo] = useState({ total: 0, applied: [] as string[], standardTotal: 0, savings: 0 });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const info = calculatePrice(quantity, basePrice, promos);
     setPricingInfo(info);
   }, [quantity, basePrice, promos]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (quantity <= 0) return;
+    if (quantity <= 0 || isSubmitting) return;
+
+    setIsSubmitting(true);
 
     const newSale: Sale = {
       id: Date.now().toString(),
@@ -35,7 +38,39 @@ const OrderForm: React.FC<OrderFormProps> = ({ promos, basePrice, onAddSale }) =
       appliedPromos: pricingInfo.applied
     };
 
-    onAddSale(newSale);
+    try {
+      // Save to Firebase
+      const result = await addSale({
+        customerName: newSale.customerName,
+        quantity: newSale.quantity,
+        total: newSale.totalPrice,
+        paymentMethod: newSale.paymentMethod === PaymentMethod.CASH ? 'cash' : 'qr',
+        productName: 'Kacang Parpu',
+        pricePerUnit: basePrice,
+        appliedPromos: newSale.appliedPromos
+      });
+
+      if (result.success) {
+        // Update the sale ID with Firebase ID
+        newSale.id = result.id || newSale.id;
+        
+        // Call the parent's onAddSale to update local state
+        onAddSale(newSale);
+
+        // Reset form
+        setCustomerName('');
+        setQuantity(1);
+        setPaymentMethod(PaymentMethod.CASH);
+      } else {
+        alert('Error saving sale to database. Please try again.');
+        console.error('Firebase error:', result.error);
+      }
+    } catch (error) {
+      console.error('Error submitting sale:', error);
+      alert('Error saving sale. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -61,6 +96,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ promos, basePrice, onAddSale }) =
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Optional: Enter Name"
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 bg-slate-50 text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:bg-white outline-none transition-all font-medium"
+                  disabled={isSubmitting}
                 />
               </div>
             </div>
@@ -72,7 +108,8 @@ const OrderForm: React.FC<OrderFormProps> = ({ promos, basePrice, onAddSale }) =
                 <button 
                   type="button"
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-12 h-12 rounded-xl bg-slate-200 flex items-center justify-center text-slate-900 text-xl font-black hover:bg-slate-300 transition-colors"
+                  className="w-12 h-12 rounded-xl bg-slate-200 flex items-center justify-center text-slate-900 text-xl font-black hover:bg-slate-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isSubmitting}
                 >
                   -
                 </button>
@@ -82,11 +119,13 @@ const OrderForm: React.FC<OrderFormProps> = ({ promos, basePrice, onAddSale }) =
                   value={quantity}
                   onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
                   className="flex-1 text-center py-3 rounded-xl border border-slate-300 bg-slate-50 text-slate-900 text-xl font-black focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none"
+                  disabled={isSubmitting}
                 />
                 <button 
                    type="button"
                    onClick={() => setQuantity(quantity + 1)}
-                   className="w-12 h-12 rounded-xl bg-slate-200 flex items-center justify-center text-slate-900 text-xl font-black hover:bg-slate-300 transition-colors"
+                   className="w-12 h-12 rounded-xl bg-slate-200 flex items-center justify-center text-slate-900 text-xl font-black hover:bg-slate-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                   disabled={isSubmitting}
                 >
                   +
                 </button>
@@ -106,6 +145,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ promos, basePrice, onAddSale }) =
                     ? 'border-orange-500 bg-orange-50 text-orange-800' 
                     : 'border-slate-200 bg-white hover:border-slate-300 text-slate-600'
                 }`}
+                disabled={isSubmitting}
               >
                 <Wallet size={20} className={paymentMethod === PaymentMethod.CASH ? 'text-orange-600' : 'text-slate-400'} />
                 <span className="font-black">CASH</span>
@@ -118,6 +158,7 @@ const OrderForm: React.FC<OrderFormProps> = ({ promos, basePrice, onAddSale }) =
                     ? 'border-sky-500 bg-sky-50 text-sky-800' 
                     : 'border-slate-200 bg-white hover:border-slate-300 text-slate-600'
                 }`}
+                disabled={isSubmitting}
               >
                 <CreditCard size={20} className={paymentMethod === PaymentMethod.QR ? 'text-sky-600' : 'text-slate-400'} />
                 <span className="font-black">QR PAY</span>
@@ -157,9 +198,14 @@ const OrderForm: React.FC<OrderFormProps> = ({ promos, basePrice, onAddSale }) =
               </div>
               <button 
                 type="submit"
-                className="w-full md:w-auto bg-orange-500 hover:bg-orange-600 text-white font-black py-4 px-12 rounded-xl shadow-lg shadow-orange-200 transition-all flex items-center justify-center gap-2 active:scale-95 text-lg"
+                disabled={isSubmitting}
+                className={`w-full md:w-auto font-black py-4 px-12 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-lg ${
+                  isSubmitting
+                    ? 'bg-slate-400 cursor-not-allowed shadow-slate-200'
+                    : 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-200 active:scale-95'
+                }`}
               >
-                Complete Sale
+                {isSubmitting ? 'Processing...' : 'Complete Sale'}
               </button>
             </div>
           </div>

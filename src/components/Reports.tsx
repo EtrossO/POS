@@ -1,19 +1,53 @@
-
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileDown, FileText, Calendar, Table, Download } from 'lucide-react';
-import { Sale } from '../types';
+import { Sale, PaymentMethod } from '../types';
+import { getAllSales } from '../salesService';
 
 interface ReportsProps {
   sales: Sale[];
 }
 
-const Reports: React.FC<ReportsProps> = ({ sales }) => {
+const Reports: React.FC<ReportsProps> = ({ sales: propSales }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [sales, setSales] = useState<Sale[]>(propSales);
+  const [loading, setLoading] = useState(true);
 
-const formatDate = (timestamp: string | number | Date, includeTime: boolean = true) => {
+  // Load sales from Firebase on mount
+  useEffect(() => {
+    loadSalesFromFirebase();
+  }, []);
+
+  // Update local state when props change
+  useEffect(() => {
+    setSales(propSales);
+  }, [propSales]);
+
+  const loadSalesFromFirebase = async () => {
+    setLoading(true);
+    const result = await getAllSales();
+    
+    if (result.success && result.data.length > 0) {
+      // Convert Firebase format to your Sale format
+      const convertedSales: Sale[] = result.data.map((fbSale: any) => ({
+        id: fbSale.id,
+        customerName: fbSale.customerName,
+        quantity: fbSale.quantity,
+        totalPrice: fbSale.total,
+        paymentMethod: fbSale.paymentMethod === 'cash' ? PaymentMethod.CASH : PaymentMethod.QR,
+        timestamp: fbSale.timestamp instanceof Date ? fbSale.timestamp.getTime() : new Date(fbSale.timestamp).getTime(),
+        appliedPromos: fbSale.appliedPromos || []
+      }));
+      
+      setSales(convertedSales);
+    }
+    
+    setLoading(false);
+  };
+
+  const formatDate = (timestamp: string | number | Date, includeTime: boolean = true) => {
     const date = new Date(timestamp);
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -27,7 +61,7 @@ const formatDate = (timestamp: string | number | Date, includeTime: boolean = tr
     return formatted;
   };
 
-const titleCase = (name: string) => {
+  const titleCase = (name: string) => {
     return name
       .toLowerCase()
       .split(' ')
@@ -132,6 +166,20 @@ const titleCase = (name: string) => {
 
     doc.save(filename);
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm">
+          <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <FileText className="text-slate-400" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-800">Loading reports...</h3>
+          <p className="text-slate-500 max-w-xs mx-auto mt-2">Please wait while we fetch your data.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">

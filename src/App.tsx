@@ -16,9 +16,10 @@ import SalesHistory from './components/SalesHistory';
 import Settings from './components/Settings';
 import GeminiInsights from './components/GeminiInsight';
 import Reports from './components/Reports';
+import CustomerManager from './components/CustomerManager';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'order' | 'history' | 'settings' | 'ai' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'order' | 'history' | 'settings' | 'ai' | 'reports' | 'customers'>('dashboard');
   
   // State Initialization
   const [sales, setSales] = useState<Sale[]>(() => {
@@ -124,6 +125,12 @@ const App: React.FC = () => {
             icon={<SettingsIcon size={20} />} 
             label="Settings" 
           />
+          <NavItem 
+            active={activeTab === 'customers'} 
+            onClick={() => setActiveTab('customers')}
+            icon={<Package size={20} />} 
+            label="Customers" 
+          />
         </nav>
 
         <div className="mt-auto pt-6 border-t border-slate-100">
@@ -166,6 +173,9 @@ const App: React.FC = () => {
               setBasePrice={setBasePrice} 
             />
           )}
+          {activeTab === 'customers' && (
+            <CustomerManager />
+          )}
         </div>
       </main>
 
@@ -200,6 +210,11 @@ const App: React.FC = () => {
           active={activeTab === 'settings'} 
           onClick={() => setActiveTab('settings')}
           icon={<SettingsIcon size={24} />} 
+        />
+        <MobileNavItem 
+          active={activeTab === 'customers'} 
+          onClick={() => setActiveTab('customers')}
+          icon={<Package size={24} />} 
         />
       </nav>
     </div>

@@ -1,15 +1,55 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trash2, Calendar, User, Hash, DollarSign, AlertCircle, X } from 'lucide-react';
 import { Sale, PaymentMethod } from '../types';
+import { getAllSales, deleteSale } from '../salesService';
 
 interface SalesHistoryProps {
   sales: Sale[];
   onDelete: (id: string) => void;
+  onSalesLoaded?: (sales: Sale[]) => void;
 }
 
-const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDelete }) => {
+const SalesHistory: React.FC<SalesHistoryProps> = ({ sales: propSales, onDelete, onSalesLoaded }) => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sales, setSales] = useState<Sale[]>(propSales);
+  const [loading, setLoading] = useState(true);
+
+  // Load sales from Firebase on mount
+  useEffect(() => {
+    loadSalesFromFirebase();
+  }, []);
+
+  // Update local state when props change
+  useEffect(() => {
+    setSales(propSales);
+  }, [propSales]);
+
+  const loadSalesFromFirebase = async () => {
+    setLoading(true);
+    const result = await getAllSales();
+    
+    if (result.success && result.data.length > 0) {
+      // Convert Firebase format to your Sale format
+      const convertedSales: Sale[] = result.data.map((fbSale: any) => ({
+        id: fbSale.id,
+        customerName: fbSale.customerName,
+        quantity: fbSale.quantity,
+        totalPrice: fbSale.total,
+        paymentMethod: fbSale.paymentMethod === 'cash' ? PaymentMethod.CASH : PaymentMethod.QR,
+        timestamp: fbSale.timestamp instanceof Date ? fbSale.timestamp.getTime() : new Date(fbSale.timestamp).getTime(),
+        appliedPromos: fbSale.appliedPromos || []
+      }));
+      
+      setSales(convertedSales);
+      
+      // Notify parent component if callback provided
+      if (onSalesLoaded) {
+        onSalesLoaded(convertedSales);
+      }
+    }
+    
+    setLoading(false);
+  };
 
   const toTitleCase = (s: string) =>
     s
@@ -19,15 +59,39 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDelete }) => {
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
       .join(' ');
 
-  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+  const handleDeleteClick = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (deletingId === id) {
-      onDelete(id);
-      setDeletingId(null);
+      // Confirm delete - delete from Firebase
+      const result = await deleteSale(id);
+      
+      if (result.success) {
+        // Call parent's onDelete to update local state
+        onDelete(id);
+        
+        // Update local state
+        setSales(sales.filter(s => s.id !== id));
+        setDeletingId(null);
+      } else {
+        alert('Error deleting sale. Please try again.');
+        console.error('Firebase delete error:', result.error);
+      }
     } else {
       setDeletingId(id);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm animate-in fade-in duration-500">
+        <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+          <Hash className="text-slate-400" />
+        </div>
+        <h3 className="text-xl font-bold text-slate-800">Loading sales history...</h3>
+        <p className="text-slate-500 max-w-xs mx-auto mt-2">Please wait while we fetch your data.</p>
+      </div>
+    );
+  }
 
   if (sales.length === 0) {
     return (
