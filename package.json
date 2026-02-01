@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.38.0",
+    "@google/genai": "^1.39.0",
     "fetch-blob": "^4.0.0",
     "firebase": "^12.8.0",
     "formdata-polyfill": "^4.0.10",
