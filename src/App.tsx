@@ -7,7 +7,8 @@ import {
   Settings as SettingsIcon,
   BrainCircuit,
   Package,
-  FileText
+  FileText,
+  CalendarCheck
 } from 'lucide-react';
 import { Sale, PromoRule, PaymentMethod, BusinessStats } from './types';
 import Dashboard from './components/Dashboard';
@@ -17,9 +18,10 @@ import Settings from './components/Settings';
 import GeminiInsights from './components/GeminiInsight';
 import Reports from './components/Reports';
 import CustomerManager from './components/CustomerManager';
+import BookingSystem from './components/BookingSystem';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'order' | 'history' | 'settings' | 'ai' | 'reports' | 'customers'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'order' | 'history' | 'settings' | 'ai' | 'reports' | 'customers' | 'bookings'>('dashboard');
   
   // State Initialization
   const [sales, setSales] = useState<Sale[]>(() => {
@@ -131,6 +133,12 @@ const App: React.FC = () => {
             icon={<Package size={20} />} 
             label="Customers" 
           />
+          <NavItem 
+            active={activeTab === 'booking'} 
+            onClick={() => setActiveTab('booking')}
+            icon={<CalendarCheck size={20} />} 
+            label="Booking System" 
+          />
         </nav>
 
         <div className="mt-auto pt-6 border-t border-slate-100">
@@ -176,6 +184,9 @@ const App: React.FC = () => {
           {activeTab === 'customers' && (
             <CustomerManager />
           )}
+          {activeTab === 'booking' && (
+            <BookingSystem />
+          )}
         </div>
       </main>
 
@@ -215,6 +226,11 @@ const App: React.FC = () => {
           active={activeTab === 'customers'} 
           onClick={() => setActiveTab('customers')}
           icon={<Package size={24} />} 
+        />
+        <MobileNavItem 
+          active={activeTab === 'booking'} 
+          onClick={() => setActiveTab('booking')}
+          icon={<CalendarCheck size={24} />} 
         />
       </nav>
     </div>
