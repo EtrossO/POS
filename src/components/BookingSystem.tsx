@@ -116,9 +116,17 @@ const BookingSystem: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    
+    let processedValue = value;
+    
+    // Auto-capitalize customer name and address as user types
+    if (name === 'customerName' || name === 'address') {
+      processedValue = capitalizeWords(value);
+    }
+    
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'quantity' ? parseInt(value) || 1 : value
+      [name]: name === 'quantity' ? parseInt(value) || 1 : processedValue
     }));
   };
 
@@ -146,10 +154,9 @@ const BookingSystem: React.FC = () => {
     }
 
     try {
-      // Capitalize customer name before saving
+      // Prepare booking data with auto-status based on payment method
       const bookingData = {
         ...formData,
-        customerName: capitalizeWords(formData.customerName),
         status: formData.paymentMethod === 'online' ? 'confirmed' : 'pending'
       };
 
@@ -264,7 +271,7 @@ const BookingSystem: React.FC = () => {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 text-white mb-8 shadow-xl">
+      <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl p-8 text-white mb-8 shadow-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-sm">
@@ -272,12 +279,12 @@ const BookingSystem: React.FC = () => {
             </div>
             <div>
               <h1 className="text-3xl font-black">Bulk Order Booking System</h1>
-              <p className="text-purple-100 font-medium mt-1">Manage your wholesale orders efficiently</p>
+              <p className="text-orange-100 font-medium mt-1">Manage your wholesale orders efficiently</p>
             </div>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="bg-white text-purple-600 font-black px-6 py-3 rounded-xl hover:bg-purple-50 transition-all shadow-lg active:scale-95"
+            className="bg-white text-orange-600 font-black px-6 py-3 rounded-xl hover:bg-orange-50 transition-all shadow-lg active:scale-95"
           >
             {showForm ? 'Cancel' : '+ New Booking'}
           </button>
@@ -289,7 +296,7 @@ const BookingSystem: React.FC = () => {
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-500 text-sm font-bold">Total Bookings</span>
-            <Package className="text-purple-500" size={24} />
+            <Package className="text-orange-500" size={24} />
           </div>
           <p className="text-3xl font-black text-slate-900">{stats.total}</p>
         </div>
@@ -325,7 +332,7 @@ const BookingSystem: React.FC = () => {
       {showForm && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 mb-8 animate-in slide-in-from-top-4 duration-300">
           <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-2">
-            <Package className="text-purple-600" />
+            <Package className="text-orange-600" />
             {editingId ? 'Edit Booking' : 'New Bulk Order Booking'}
           </h2>
           
@@ -334,7 +341,7 @@ const BookingSystem: React.FC = () => {
               {/* Customer Name */}
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-900 flex items-center gap-1">
-                  <User size={16} className="text-purple-600" />
+                  <User size={16} className="text-orange-600" />
                   Customer Name *
                 </label>
                 <input
@@ -344,14 +351,14 @@ const BookingSystem: React.FC = () => {
                   onChange={handleInputChange}
                   placeholder="Enter full name"
                   required
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 font-medium focus:border-purple-500 focus:bg-white outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 font-medium focus:border-orange-500 focus:bg-white outline-none transition-all"
                 />
               </div>
 
               {/* Phone */}
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-900 flex items-center gap-1">
-                  <Phone size={16} className="text-purple-600" />
+                  <Phone size={16} className="text-orange-600" />
                   Phone Number *
                 </label>
                 <input
@@ -361,14 +368,14 @@ const BookingSystem: React.FC = () => {
                   onChange={handleInputChange}
                   placeholder="e.g., 012-3456789"
                   required
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 font-medium focus:border-purple-500 focus:bg-white outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 font-medium focus:border-orange-500 focus:bg-white outline-none transition-all"
                 />
               </div>
 
               {/* Quantity */}
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-900 flex items-center gap-1">
-                  <Package size={16} className="text-purple-600" />
+                  <Package size={16} className="text-orange-600" />
                   Quantity
                 </label>
                 <div className="relative">
@@ -379,7 +386,7 @@ const BookingSystem: React.FC = () => {
                     onChange={handleInputChange}
                     min="1"
                     required
-                    className="w-full px-4 py-3 pr-16 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 font-bold text-xl focus:border-purple-500 focus:bg-white outline-none transition-all"
+                    className="w-full px-4 py-3 pr-16 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 font-bold text-xl focus:border-orange-500 focus:bg-white outline-none transition-all"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
                     pcs
@@ -393,7 +400,7 @@ const BookingSystem: React.FC = () => {
               {/* Payment Method */}
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-900 flex items-center gap-1">
-                  <CreditCard size={16} className="text-purple-600" />
+                  <CreditCard size={16} className="text-orange-600" />
                   Payment Method
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -434,7 +441,7 @@ const BookingSystem: React.FC = () => {
             {/* Address */}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-900 flex items-center gap-1">
-                <MapPin size={16} className="text-purple-600" />
+                <MapPin size={16} className="text-orange-600" />
                 Delivery Address *
               </label>
               <textarea
@@ -444,7 +451,7 @@ const BookingSystem: React.FC = () => {
                 placeholder="Enter complete delivery address"
                 required
                 rows={3}
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 font-medium focus:border-purple-500 focus:bg-white outline-none transition-all resize-none"
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 font-medium focus:border-orange-500 focus:bg-white outline-none transition-all resize-none"
               />
             </div>
 
@@ -459,7 +466,7 @@ const BookingSystem: React.FC = () => {
                 onChange={handleInputChange}
                 placeholder="Any special instructions or requests..."
                 rows={2}
-                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 font-medium focus:border-purple-500 focus:bg-white outline-none transition-all resize-none"
+                className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-900 font-medium focus:border-orange-500 focus:bg-white outline-none transition-all resize-none"
               />
             </div>
 
@@ -467,7 +474,7 @@ const BookingSystem: React.FC = () => {
             <div className="flex gap-4 pt-4">
               <button
                 type="submit"
-                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-black py-4 rounded-xl shadow-lg shadow-purple-200 transition-all active:scale-95"
+                className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-black py-4 rounded-xl shadow-lg shadow-orange-200 transition-all active:scale-95"
               >
                 {editingId ? 'Update Booking' : 'Create Booking'}
               </button>
@@ -494,7 +501,7 @@ const BookingSystem: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by name or phone..."
-              className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 font-medium focus:border-purple-500 focus:bg-white outline-none transition-all"
+              className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 font-medium focus:border-orange-500 focus:bg-white outline-none transition-all"
             />
           </div>
 
@@ -506,7 +513,7 @@ const BookingSystem: React.FC = () => {
                 onClick={() => setFilterStatus(status)}
                 className={`px-4 py-3 rounded-xl font-bold transition-all capitalize ${
                   filterStatus === status
-                    ? 'bg-purple-600 text-white shadow-md'
+                    ? 'bg-orange-600 text-white shadow-md'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
@@ -558,7 +565,7 @@ const BookingSystem: React.FC = () => {
                   <tr key={booking.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-black">
+                        <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-700 font-black">
                           {booking.customerName.charAt(0).toUpperCase()}
                         </div>
                         <div>
@@ -576,7 +583,7 @@ const BookingSystem: React.FC = () => {
                       <span className="text-sm font-bold text-slate-900">{booking.quantity} pcs</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm font-black text-purple-700">RM {booking.totalPrice.toFixed(2)}</span>
+                      <span className="text-sm font-black text-orange-700">RM {booking.totalPrice.toFixed(2)}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded-lg text-xs font-black uppercase border ${
@@ -613,7 +620,7 @@ const BookingSystem: React.FC = () => {
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => setViewingBooking(booking)}
-                          className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                          className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-all"
                           title="View details"
                         >
                           <Eye size={18} />
@@ -643,8 +650,8 @@ const BookingSystem: React.FC = () => {
       </div>
 
       {/* Help Text */}
-      <div className="mt-6 p-4 bg-purple-50 rounded-xl border border-purple-100">
-        <p className="text-sm text-purple-900 font-medium flex items-center gap-2">
+      <div className="mt-6 p-4 bg-orange-50 rounded-xl border border-orange-100">
+        <p className="text-sm text-orange-900 font-medium flex items-center gap-2">
           <AlertCircle size={16} />
           <span>
             <strong>Tip:</strong> Online payments are automatically marked as "Confirmed", while COD/Cash orders start as "Pending". 
@@ -658,7 +665,7 @@ const BookingSystem: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-300">
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white rounded-t-3xl sticky top-0 z-10">
+            <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 text-white rounded-t-3xl sticky top-0 z-10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
@@ -666,7 +673,7 @@ const BookingSystem: React.FC = () => {
                   </div>
                   <div>
                     <h2 className="text-2xl font-black">Booking Details</h2>
-                    <p className="text-purple-100 text-sm font-medium">Complete order information</p>
+                    <p className="text-orange-100 text-sm font-medium">Complete order information</p>
                   </div>
                 </div>
                 <button
@@ -682,8 +689,8 @@ const BookingSystem: React.FC = () => {
             <div className="p-8 space-y-6">
               {/* Customer Info Section */}
               <div className="space-y-4">
-                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 pb-2 border-b-2 border-purple-100">
-                  <User size={20} className="text-purple-600" />
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 pb-2 border-b-2 border-orange-100">
+                  <User size={20} className="text-orange-600" />
                   Customer Information
                 </h3>
                 
@@ -713,30 +720,30 @@ const BookingSystem: React.FC = () => {
 
               {/* Order Details Section */}
               <div className="space-y-4">
-                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 pb-2 border-b-2 border-purple-100">
-                  <Package size={20} className="text-purple-600" />
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 pb-2 border-b-2 border-orange-100">
+                  <Package size={20} className="text-orange-600" />
                   Order Details
                 </h3>
                 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
-                    <p className="text-xs font-bold text-purple-700 uppercase mb-1">Quantity</p>
-                    <p className="text-3xl font-black text-purple-900">{viewingBooking.quantity}</p>
-                    <p className="text-xs text-purple-600 mt-1">pcs</p>
+                  <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-200">
+                    <p className="text-xs font-bold text-orange-700 uppercase mb-1">Quantity</p>
+                    <p className="text-3xl font-black text-orange-900">{viewingBooking.quantity}</p>
+                    <p className="text-xs text-orange-600 mt-1">pcs</p>
                   </div>
                   
-                  <div className="bg-purple-50 rounded-xl p-4 border-2 border-purple-200">
-                    <p className="text-xs font-bold text-purple-700 uppercase mb-1">Total Price</p>
-                    <p className="text-3xl font-black text-purple-900">RM {viewingBooking.totalPrice.toFixed(2)}</p>
-                    <p className="text-xs text-purple-600 mt-1">{viewingBooking.quantity} × RM {BASE_PRICE.toFixed(2)}</p>
+                  <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-200">
+                    <p className="text-xs font-bold text-orange-700 uppercase mb-1">Total Price</p>
+                    <p className="text-3xl font-black text-orange-900">RM {viewingBooking.totalPrice.toFixed(2)}</p>
+                    <p className="text-xs text-orange-600 mt-1">{viewingBooking.quantity} × RM {BASE_PRICE.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
 
               {/* Payment & Status Section */}
               <div className="space-y-4">
-                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 pb-2 border-b-2 border-purple-100">
-                  <CreditCard size={20} className="text-purple-600" />
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 pb-2 border-b-2 border-orange-100">
+                  <CreditCard size={20} className="text-orange-600" />
                   Payment & Status
                 </h3>
                 
@@ -766,8 +773,8 @@ const BookingSystem: React.FC = () => {
               {/* Additional Notes */}
               {viewingBooking.notes && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 pb-2 border-b-2 border-purple-100">
-                    <AlertCircle size={20} className="text-purple-600" />
+                  <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 pb-2 border-b-2 border-orange-100">
+                    <AlertCircle size={20} className="text-orange-600" />
                     Additional Notes
                   </h3>
                   <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
@@ -778,8 +785,8 @@ const BookingSystem: React.FC = () => {
 
               {/* Timestamps */}
               <div className="space-y-4">
-                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 pb-2 border-b-2 border-purple-100">
-                  <Calendar size={20} className="text-purple-600" />
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 pb-2 border-b-2 border-orange-100">
+                  <Calendar size={20} className="text-orange-600" />
                   Timeline
                 </h3>
                 
