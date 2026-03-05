@@ -35,7 +35,8 @@ const Reports: React.FC<ReportsProps> = ({ sales: propSales }) => {
         id: fbSale.id,
         customerName: fbSale.customerName,
         quantity: fbSale.quantity,
-        totalPrice: fbSale.total,
+        // handle both legacy 'total' and new 'totalPrice' fields
+        totalPrice: fbSale.totalPrice != null ? fbSale.totalPrice : fbSale.total || 0,
         paymentMethod: fbSale.paymentMethod === 'cash' ? PaymentMethod.CASH : PaymentMethod.QR,
         timestamp: fbSale.timestamp instanceof Date ? fbSale.timestamp.getTime() : new Date(fbSale.timestamp).getTime(),
         appliedPromos: fbSale.appliedPromos || []

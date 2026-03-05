@@ -17,8 +17,8 @@ const GeminiInsights: React.FC<GeminiInsightsProps> = ({ sales, promos, basePric
   const generateInsights = async () => {
     setLoading(true);
     try {
-      // Re-initializing Gemini client right before use as per best practices
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Initialize Gemini client with environment variable
+      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
       
       const salesDataSummary = sales.map(s => ({
         qty: s.quantity,
@@ -38,9 +38,8 @@ const GeminiInsights: React.FC<GeminiInsightsProps> = ({ sales, promos, basePric
       3. Trend analysis (Cash vs QR).
       Keep it professional, concise, and formatted in clean Markdown with bullet points.`;
 
-      // Upgraded to gemini-3-pro-preview for complex reasoning tasks like business analysis
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-2.5-flash',
         contents: prompt,
       });
 

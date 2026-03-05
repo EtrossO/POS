@@ -26,29 +26,37 @@ const SalesHistory: React.FC<SalesHistoryProps> = ({ sales: propSales, onDelete,
 
   const loadSalesFromFirebase = async () => {
     setLoading(true);
-    const result = await getAllSales();
-    
-    if (result.success && result.data.length > 0) {
-      // Convert Firebase format to your Sale format
-      const convertedSales: Sale[] = result.data.map((fbSale: any) => ({
-        id: fbSale.id,
-        customerName: fbSale.customerName,
-        quantity: fbSale.quantity,
-        totalPrice: fbSale.total,
-        paymentMethod: fbSale.paymentMethod === 'cash' ? PaymentMethod.CASH : PaymentMethod.QR,
-        timestamp: fbSale.timestamp instanceof Date ? fbSale.timestamp.getTime() : new Date(fbSale.timestamp).getTime(),
-        appliedPromos: fbSale.appliedPromos || []
-      }));
+    try {
+      const result = await getAllSales();
       
-      setSales(convertedSales);
-      
-      // Notify parent component if callback provided
-      if (onSalesLoaded) {
-        onSalesLoaded(convertedSales);
+      if (result.success && result.data.length > 0) {
+        // Convert Firebase format to your Sale format
+        const convertedSales: Sale[] = result.data.map((fbSale: any) => ({
+          id: fbSale.id,
+          customerName: fbSale.customerName,
+          quantity: fbSale.quantity,
+          // Firestore documents may have either 'totalPrice' or older 'total'
+          totalPrice: fbSale.totalPrice != null ? fbSale.totalPrice : fbSale.total || 0,
+          paymentMethod: fbSale.paymentMethod === 'cash' ? PaymentMethod.CASH : PaymentMethod.QR,
+          timestamp: fbSale.timestamp instanceof Date ? fbSale.timestamp.getTime() : new Date(fbSale.timestamp).getTime(),
+          appliedPromos: fbSale.appliedPromos || []
+        }));
+        
+        setSales(convertedSales);
+        
+        // Notify parent component if callback provided
+        if (onSalesLoaded) {
+          onSalesLoaded(convertedSales);
+        }
+      } else {
+        // if no records keep existing props
+        setSales(propSales);
       }
+    } catch (err) {
+      console.error('Failed to load sales from Firebase', err);
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   const toTitleCase = (s: string) =>

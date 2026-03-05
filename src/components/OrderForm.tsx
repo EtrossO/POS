@@ -43,10 +43,8 @@ const OrderForm: React.FC<OrderFormProps> = ({ promos, basePrice, onAddSale }) =
       const result = await addSale({
         customerName: newSale.customerName,
         quantity: newSale.quantity,
-        total: newSale.totalPrice,
-        paymentMethod: newSale.paymentMethod === PaymentMethod.CASH ? 'cash' : 'qr',
-        productName: 'Kacang Parpu',
-        pricePerUnit: basePrice,
+        totalPrice: newSale.totalPrice,
+        paymentMethod: newSale.paymentMethod,
         appliedPromos: newSale.appliedPromos
       });
 
