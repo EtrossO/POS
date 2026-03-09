@@ -1,9 +1,13 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, GenerateContentParameters } from '@google/genai';
 
-// Initialize the client once
 const ai = new GoogleGenAI({
-  apiKey: import.meta.env.VITE_GEMINI_API_KEY // Use process.env for Node.js
+  apiKey: import.meta.env.VITE_GEMINI_API_KEY
 });
 
-// Export the specific model you want to use
-export const model = ai.models.get('gemini-2.5-flash');
+// Export a typed function for generating content
+export const generateContent = async (params: Omit<GenerateContentParameters, 'model'>) => {
+  return ai.models.generateContent({
+    model: 'gemini-2.0-flash', // ✅ Use correct model name
+    ...params
+  });
+};

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Calendar, User, Hash, DollarSign, AlertCircle, X } from 'lucide-react';
+import { Trash2, Hash, AlertCircle, X } from 'lucide-react';
 import { Sale, PaymentMethod } from '../types';
 import { getAllSales, deleteSale } from '../salesService';
 

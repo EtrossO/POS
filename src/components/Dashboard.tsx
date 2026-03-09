@@ -13,7 +13,7 @@ import {
   Pie
 } from 'recharts';
 import { TrendingUp, Package, Wallet, CreditCard } from 'lucide-react';
-import { BusinessStats, Sale, PaymentMethod } from '../types';
+import { BusinessStats, Sale,} from '../types';
 
 interface DashboardProps {
   stats: BusinessStats;

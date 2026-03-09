@@ -134,8 +134,8 @@ const App: React.FC = () => {
             label="Customers" 
           />
           <NavItem 
-            active={activeTab === 'booking'} 
-            onClick={() => setActiveTab('booking')}
+            active={activeTab === 'bookings'} 
+            onClick={() => setActiveTab('bookings')}
             icon={<CalendarCheck size={20} />} 
             label="Booking System" 
           />
@@ -184,7 +184,7 @@ const App: React.FC = () => {
           {activeTab === 'customers' && (
             <CustomerManager />
           )}
-          {activeTab === 'booking' && (
+          {activeTab === 'bookings' && (
             <BookingSystem />
           )}
         </div>
@@ -228,8 +228,8 @@ const App: React.FC = () => {
           icon={<Package size={24} />} 
         />
         <MobileNavItem 
-          active={activeTab === 'booking'} 
-          onClick={() => setActiveTab('booking')}
+          active={activeTab === 'bookings'} 
+          onClick={() => setActiveTab('bookings')}
           icon={<CalendarCheck size={24} />} 
         />
       </nav>

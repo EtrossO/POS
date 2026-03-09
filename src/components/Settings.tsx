@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, Trash2, Save, DollarSign, Tag, Info, AlertCircle, X, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, DollarSign, Tag, Info, X, RefreshCw } from 'lucide-react';
 import { PromoRule } from '../types';
 
 interface SettingsProps {

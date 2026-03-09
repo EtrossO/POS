@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, User, ShoppingBag, CreditCard, Wallet, CheckCircle, Tag } from 'lucide-react';
+import { User, ShoppingBag, CreditCard, Wallet, CheckCircle, Tag } from 'lucide-react';
 import { PromoRule, PaymentMethod, Sale } from '../types';
 import { calculatePrice } from '../utils/pricing';
 import { addSale } from '../salesService';

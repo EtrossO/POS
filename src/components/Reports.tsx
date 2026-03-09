@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
 import React, { useState, useEffect } from 'react';
-import { FileDown, FileText, Calendar, Table, Download } from 'lucide-react';
+import { FileText, Calendar, Table, Download } from 'lucide-react';
 import { Sale, PaymentMethod } from '../types';
 import { getAllSales } from '../salesService';
 

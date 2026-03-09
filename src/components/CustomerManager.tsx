@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   addCustomer, 
   getAllCustomers, 
-  updateCustomer, 
   deleteCustomer,
   Customer 
 } from '../customerService';
