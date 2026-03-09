@@ -10,6 +10,8 @@ import {
   FileText,
   CalendarCheck
 } from 'lucide-react';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { db } from './firebaseConfig';
 import { Sale, PromoRule, PaymentMethod, BusinessStats } from './types';
 import Dashboard from './components/Dashboard';
 import OrderForm from './components/OrderForm';
@@ -48,6 +50,23 @@ const App: React.FC = () => {
     localStorage.setItem('kp_promos', JSON.stringify(promos));
     localStorage.setItem('kp_base_price', basePrice.toString());
   }, [sales, promos, basePrice]);
+
+  // Real-time sync sales from Firebase to keep dashboard in sync across devices
+  useEffect(() => {
+    const q = query(collection(db, 'sales'), orderBy('timestamp', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const remoteSales: Sale[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate ? doc.data().timestamp.toDate() : doc.data().timestamp,
+      } as Sale));
+      setSales(remoteSales);
+    }, (error) => {
+      console.error('Error listening to sales updates:', error);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Derived Stats
   const stats: BusinessStats = useMemo(() => {
@@ -165,6 +184,7 @@ const App: React.FC = () => {
             <SalesHistory 
               sales={sales} 
               onDelete={deleteSale} 
+              onSalesLoaded={setSales}
             />
           )}
           {activeTab === 'reports' && (
