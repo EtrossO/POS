@@ -25,17 +25,29 @@ interface VariantSettings {
   promos: PromoRule[];
 }
 
+interface BookingItem {
+  id: string;
+  variant: VariantId;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  promoLabel?: string;
+}
+
 interface Booking {
   id?: string;
   customerName: string;
   phone: string;
   address: string;
-  quantity: number;
-  variant: VariantId;
   paymentMethod: 'online' | 'cod';
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
-  unitPrice: number;
-  totalPrice: number;
+  items: BookingItem[];
+  totalAmount: number;
+  // Backwards compatibility with older bookings
+  variant?: VariantId;
+  quantity?: number;
+  unitPrice?: number;
+  totalPrice?: number;
   promoLabel?: string;
   notes?: string;
   createdAt?: Date;
@@ -97,6 +109,16 @@ const calcPrice = (
   };
 };
 
+const makeBookingItemId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return `${Date.now()}-${Math.floor(Math.random()*1e9)}`;
+};
+
+const createBookingItem = (variant: VariantId, quantity: number, settings: Record<VariantId, VariantSettings>): BookingItem => {
+  const { unitPrice, totalPrice, promoLabel } = calcPrice(variant, quantity, settings);
+  return { id: makeBookingItemId(), variant, quantity, unitPrice, totalPrice, promoLabel };
+};
+
 // ═════════════════════════════════════════════════════════════════════════════
 const BookingSystem: React.FC = () => {
 
@@ -118,8 +140,17 @@ const BookingSystem: React.FC = () => {
   const [viewingBooking, setViewingBooking] = useState<Booking | null>(null);
 
   const makeDefault = (): Booking => {
-    const { unitPrice, totalPrice } = calcPrice('80g', 1, settings);
-    return { customerName:'', phone:'', address:'', quantity:1, variant:'80g', paymentMethod:'cod', status:'pending', unitPrice, totalPrice, notes:'' };
+    const item = createBookingItem('80g', 1, settings);
+    return {
+      customerName: '',
+      phone: '',
+      address: '',
+      paymentMethod: 'cod',
+      status: 'pending',
+      items: [item],
+      totalAmount: item.totalPrice,
+      notes: '',
+    };
   };
   const [formData, setFormData] = useState<Booking>(makeDefault);
 
@@ -129,11 +160,17 @@ const BookingSystem: React.FC = () => {
     setEditPriceVal(settings[activeTab].basePrice.toFixed(2));
   }, [activeTab, settings]);
 
+  // Recalculate item pricing when the pricing settings change (e.g. promo rules updated).
   useEffect(() => {
-    const { unitPrice, totalPrice, promoLabel } = calcPrice(formData.variant, formData.quantity, settings);
-    setFormData(prev => ({ ...prev, unitPrice, totalPrice, promoLabel }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.quantity, formData.variant, settings]);
+    setFormData(prev => {
+      const items = prev.items.map(item => {
+        const { unitPrice, totalPrice, promoLabel } = calcPrice(item.variant, item.quantity, settings);
+        return { ...item, unitPrice, totalPrice, promoLabel };
+      });
+      const totalAmount = items.reduce((sum, item) => sum + item.totalPrice, 0);
+      return { ...prev, items, totalAmount };
+    });
+  }, [settings]);
 
   // ── Settings helpers ──────────────────────────────────────────────────────
   const updateSettings = (next: Record<VariantId, VariantSettings>) => {
@@ -180,7 +217,21 @@ const BookingSystem: React.FC = () => {
     try {
       const snap = await getDocs(collection(db, BOOKINGS_COLLECTION));
       const data: Booking[] = [];
-      snap.forEach(d => data.push({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate(), updatedAt: d.data().updatedAt?.toDate() } as Booking));
+      snap.forEach(d => {
+        const raw = d.data() as any;
+        const items: BookingItem[] = raw.items?.length
+          ? raw.items
+          : [{
+              id: makeBookingItemId(),
+              variant: raw.variant ?? '80g',
+              quantity: raw.quantity ?? 1,
+              unitPrice: raw.unitPrice ?? 0,
+              totalPrice: raw.totalPrice ?? 0,
+              promoLabel: raw.promoLabel,
+            }];
+        const totalAmount = raw.totalAmount ?? items.reduce((sum, i) => sum + i.totalPrice, 0);
+        data.push({ id: d.id, ...raw, items, totalAmount, createdAt: raw.createdAt?.toDate(), updatedAt: raw.updatedAt?.toDate() } as Booking);
+      });
       // Sort by createdAt on client side
       data.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
       setBookings(data);
@@ -193,24 +244,67 @@ const BookingSystem: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    let v: string | number = value;
-    if (name === 'customerName' || name === 'address') v = cap(value);
-    if (name === 'quantity') v = parseInt(value) || 1;
+    const v = (name === 'customerName' || name === 'address') ? cap(value) : value;
     setFormData(prev => ({ ...prev, [name]: v }));
   };
 
   const resetForm = () => { setFormData(makeDefault()); setEditingId(null); setShowForm(false); };
+
+  const updateItem = (id: string, patch: Partial<BookingItem>) => {
+    setFormData(prev => {
+      const items = prev.items.map(item => {
+        if (item.id !== id) return item;
+        const variant = patch.variant ?? item.variant;
+        const quantity = patch.quantity ?? item.quantity;
+        const { unitPrice, totalPrice, promoLabel } = calcPrice(variant, quantity, settings);
+        return { ...item, ...patch, variant, quantity, unitPrice, totalPrice, promoLabel };
+      });
+      const totalAmount = items.reduce((sum, i) => sum + i.totalPrice, 0);
+      return { ...prev, items, totalAmount };
+    });
+  };
+
+  const addItem = () => {
+    setFormData(prev => {
+      const next = createBookingItem('80g', 1, settings);
+      const items = [...prev.items, next];
+      const totalAmount = items.reduce((sum, i) => sum + i.totalPrice, 0);
+      return { ...prev, items, totalAmount };
+    });
+  };
+
+  const removeItem = (id: string) => {
+    setFormData(prev => {
+      const items = prev.items.filter(i => i.id !== id);
+      const totalAmount = items.reduce((sum, i) => sum + i.totalPrice, 0);
+      return { ...prev, items, totalAmount };
+    });
+  };
+
+  const sanitizeForFirestore = (value: any): any => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (Array.isArray(value)) {
+      const cleaned = value.map(v => sanitizeForFirestore(v)).filter(v => v !== undefined);
+      return cleaned.length ? cleaned : undefined;
+    }
+    if (typeof value === 'object') {
+      const cleaned: any = {};
+      Object.entries(value).forEach(([k, v]) => {
+        const sanitized = sanitizeForFirestore(v);
+        if (sanitized !== undefined) cleaned[k] = sanitized;
+      });
+      return Object.keys(cleaned).length ? cleaned : undefined;
+    }
+    return value;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customerName || !formData.phone || !formData.address) { alert('Fill all required fields'); return; }
     try {
       const { id, createdAt, updatedAt, ...cleanData } = formData;
-      // remove keys with undefined values (Firestore rejects undefined)
-      const sanitized: any = {};
-      Object.entries(cleanData).forEach(([k, v]) => {
-        if (v !== undefined) sanitized[k] = v;
-      });
+      const sanitized = sanitizeForFirestore(cleanData);
       const data = { ...sanitized, status: formData.paymentMethod === 'online' ? 'confirmed' : 'pending' };
       if (editingId) {
         await updateDoc(doc(db, BOOKINGS_COLLECTION, editingId), { ...data, updatedAt: Timestamp.now() });
@@ -220,14 +314,30 @@ const BookingSystem: React.FC = () => {
         alert('Booking created!');
       }
       resetForm(); loadBookings();
-    } catch (error: any) { 
+    } catch (error: any) {
       console.error("Error saving booking:", error);
       alert(`Error saving booking: ${error?.message || error}`);
     }
   };
 
   const handleEdit = (b: Booking) => {
-    setFormData({ ...b, variant: b.variant ?? '80g', notes: b.notes || '' });
+    const items = b.items?.length
+      ? b.items
+      : [{
+          id: makeBookingItemId(),
+          variant: (b as any).variant ?? '80g',
+          quantity: (b as any).quantity ?? 1,
+          unitPrice: (b as any).unitPrice ?? 0,
+          totalPrice: (b as any).totalPrice ?? 0,
+          promoLabel: (b as any).promoLabel,
+        }];
+    const totalAmount = items.reduce((sum, item) => sum + item.totalPrice, 0);
+    setFormData({
+      ...b,
+      items,
+      totalAmount,
+      notes: b.notes || '',
+    });
     setEditingId(b.id || null); setShowForm(true);
   };
 
@@ -258,17 +368,19 @@ const BookingSystem: React.FC = () => {
     pending:   bookings.filter(b=>b.status==='pending').length,
     confirmed: bookings.filter(b=>b.status==='confirmed').length,
     completed: bookings.filter(b=>b.status==='completed').length,
-    revenue:   bookings.filter(b=>b.status==='completed').reduce((s,b)=>s+b.totalPrice,0),
-    pending$:  bookings.filter(b=>['pending','confirmed'].includes(b.status)).reduce((s,b)=>s+b.totalPrice,0),
+    revenue:   bookings.filter(b=>b.status==='completed').reduce((s,b)=>s+(b.totalAmount ?? b.totalPrice ?? 0),0),
+    pending$:  bookings.filter(b=>['pending','confirmed'].includes(b.status)).reduce((s,b)=>s+(b.totalAmount ?? b.totalPrice ?? 0),0),
   };
 
   const officialBase   = OFFICIAL_VARIANTS.find(v => v.id === activeTab)!.officialPrice;
   const currentBase    = settings[activeTab].basePrice;
   const isPriceModified = currentBase !== officialBase;
 
-  const formBasePrice  = settings[formData.variant].basePrice;
-  const hasPromo       = !!formData.promoLabel;
-  const savedPerOrder  = hasPromo ? (formBasePrice - formData.unitPrice) * formData.quantity : 0;
+  const hasPromo      = formData.items.some(i => !!i.promoLabel);
+  const savedPerOrder = formData.items.reduce((sum, item) => {
+    const base = settings[item.variant]?.basePrice ?? 0;
+    return sum + (base - item.unitPrice) * item.quantity;
+  }, 0);
 
   // ═══════════════════════════════════════════════════════════════════════════
   return (
@@ -487,59 +599,65 @@ const BookingSystem: React.FC = () => {
                   className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 font-medium focus:border-orange-500 focus:bg-white outline-none transition-all"/>
               </div>
 
-              {/* Size selector */}
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700 flex items-center gap-1.5"><Package size={14} className="text-orange-500"/> Product Size</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {OFFICIAL_VARIANTS.map(v => (
-                    <button key={v.id} type="button" onClick={() => setFormData(prev => ({ ...prev, variant: v.id }))}
-                      className={`flex flex-col items-center py-3.5 rounded-xl border-2 font-bold transition-all ${formData.variant === v.id ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-600 hover:border-orange-200'}`}>
-                      <span className="font-black text-base">{v.label}</span>
-                      <span className="text-xs opacity-70 mt-0.5">RM {settings[v.id].basePrice.toFixed(2)}</span>
-                      {settings[v.id].promos.length > 0 && (
-                        <span className="mt-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">PROMO</span>
+              {/* Order items */}
+              <div className="md:col-span-2 space-y-1.5">
+                <label className="text-sm font-bold text-slate-700 flex items-center gap-1.5"><Package size={14} className="text-orange-500"/> Order items</label>
+                <div className="space-y-3">
+                  {formData.items.map(item => (
+                    <div key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 grid grid-cols-12 gap-3 items-end">
+                      <div className="col-span-5">
+                        <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Size</label>
+                        <select
+                          value={item.variant}
+                          onChange={e => updateItem(item.id, { variant: e.target.value as VariantId })}
+                          className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white font-bold text-sm focus:border-orange-500 outline-none transition-all"
+                        >
+                          {OFFICIAL_VARIANTS.map(v => (
+                            <option key={v.id} value={v.id}>{v.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-4">
+                        <label className="text-xs font-bold text-slate-400 uppercase mb-1.5 block">Qty</label>
+                        <input
+                          type="number" min="1"
+                          value={item.quantity}
+                          onChange={e => updateItem(item.id, { quantity: parseInt(e.target.value, 10) || 1 })}
+                          className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-white font-bold text-sm focus:border-orange-500 outline-none transition-all"
+                        />
+                      </div>
+                      <div className="col-span-3 flex flex-col items-end gap-1">
+                        <p className="text-sm font-black text-slate-800">RM {item.totalPrice.toFixed(2)}</p>
+                        <p className="text-xs text-slate-400">RM {item.unitPrice.toFixed(2)}/pc</p>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          className="text-xs font-bold text-red-500 hover:text-red-600"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      {item.promoLabel && (
+                        <div className="col-span-12 text-xs text-emerald-700 font-bold">
+                          Promo: {item.promoLabel}
+                        </div>
                       )}
-                    </button>
+                    </div>
                   ))}
                 </div>
-              </div>
 
-              {/* Quantity + price preview */}
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700 flex items-center gap-1.5"><Package size={14} className="text-orange-500"/> Quantity (pcs)</label>
-                <div className="relative">
-                  <input type="number" name="quantity" value={formData.quantity} onChange={handleInputChange} min="1" required
-                    className="w-full px-4 py-3 pr-14 rounded-xl border-2 border-slate-200 bg-slate-50 font-bold text-xl focus:border-orange-500 focus:bg-white outline-none transition-all"/>
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">pcs</span>
-                </div>
+                <button type="button" onClick={addItem}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-3 rounded-xl transition-all active:scale-95 text-sm">
+                  <Plus size={16}/> Add item
+                </button>
 
-                {/* Price breakdown box */}
-                <div className={`rounded-xl p-3.5 border-2 transition-all ${hasPromo ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
-                  {hasPromo ? (
-                    <div className="flex items-start gap-2">
-                      <Tag size={14} className="text-emerald-600 mt-0.5 shrink-0"/>
-                      <div>
-                        <p className="text-xs font-black text-emerald-700">Promo: {formData.promoLabel}</p>
-                        <p className="text-base font-black text-emerald-900 mt-0.5">
-                          RM {formData.totalPrice.toFixed(2)}
-                          <span className="text-xs font-medium text-emerald-600 ml-2">
-                            save RM {savedPerOrder.toFixed(2)}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm font-bold text-slate-600">
-                      Total: <span className="text-orange-700 font-black text-base">RM {formData.totalPrice.toFixed(2)}</span>
-                      <span className="text-xs text-slate-400 ml-2">{formData.quantity} × RM {formData.unitPrice.toFixed(2)}</span>
-                    </p>
-                  )}
-                  {settings[formData.variant].promos.length > 0 && !hasPromo && (
-                    <p className="text-xs text-orange-500 mt-1.5 font-medium">
-                      💡 Bundle promos available for {formData.variant} — increase qty to unlock!
-                    </p>
-                  )}
+                <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
+                  <p className="text-sm font-black text-slate-600">Order total</p>
+                  <p className="text-xl font-black text-orange-700">RM {formData.totalAmount.toFixed(2)}</p>
                 </div>
+                {hasPromo && (
+                  <p className="text-xs text-emerald-600 mt-1">You saved RM {savedPerOrder.toFixed(2)} on this order.</p>
+                )}
               </div>
 
               {/* Payment method */}
@@ -643,16 +761,41 @@ const BookingSystem: React.FC = () => {
                     </td>
                     <td className="px-5 py-4 text-sm font-medium text-slate-600 whitespace-nowrap">{b.phone}</td>
                     <td className="px-5 py-4">
-                      <span className="px-2.5 py-1 bg-orange-50 text-orange-700 border border-orange-200 rounded-lg text-xs font-black">{b.variant ?? '—'}</span>
+                      {(() => {
+                        const items = b.items ?? [];
+                        const first = items[0];
+                        const more = Math.max(0, (items.length ?? 0) - 1);
+                        return (
+                          <div className="space-y-1">
+                            <span className="px-2.5 py-1 bg-orange-50 text-orange-700 border border-orange-200 rounded-lg text-xs font-black inline-flex items-center gap-1">
+                              {first?.variant ?? '—'}
+                              {more > 0 && <span className="text-[10px] font-bold text-slate-500">+{more}</span>}
+                            </span>
+                            {items.length > 1 && (
+                              <p className="text-xs text-slate-400 truncate max-w-[140px]">{items.map(i => `${i.variant} x${i.quantity}`).join(', ')}</p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
-                    <td className="px-5 py-4 text-sm font-bold text-slate-900 whitespace-nowrap">{b.quantity} pcs</td>
+                    <td className="px-5 py-4 text-sm font-bold text-slate-900 whitespace-nowrap">
+                      {(() => {
+                        const qty = (b.items ?? []).reduce((sum, i) => sum + i.quantity, 0) || (b.quantity ?? 0);
+                        return `${qty} pcs`;
+                      })()}
+                    </td>
                     <td className="px-5 py-4">
-                      <p className="text-sm font-bold text-slate-700">RM {(b.unitPrice ?? b.totalPrice/b.quantity).toFixed(2)}</p>
-                      {b.promoLabel && (
-                        <p className="text-xs text-emerald-600 font-bold mt-0.5 flex items-center gap-1 whitespace-nowrap"><Tag size={10}/>{b.promoLabel}</p>
+                      {(() => {
+                        const items = b.items ?? [];
+                        const qty = items.reduce((sum, i) => sum + i.quantity, 0) || 1;
+                        const unit = ((b.totalAmount ?? b.totalPrice ?? 0) / qty).toFixed(2);
+                        return <p className="text-sm font-bold text-slate-700">RM {unit}</p>;
+                      })()}
+                      {(b.items ?? []).some(i => !!i.promoLabel) && (
+                        <p className="text-xs text-emerald-600 font-bold mt-0.5 flex items-center gap-1 whitespace-nowrap"><Tag size={10}/>Promo</p>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-sm font-black text-orange-700 whitespace-nowrap">RM {b.totalPrice.toFixed(2)}</td>
+                    <td className="px-5 py-4 text-sm font-black text-orange-700 whitespace-nowrap">RM {(b.totalAmount ?? b.totalPrice ?? 0).toFixed(2)}</td>
                     <td className="px-5 py-4">
                       <span className={`px-2 py-1 rounded-lg text-xs font-black uppercase border whitespace-nowrap ${b.paymentMethod==='online' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
                         {b.paymentMethod}
@@ -716,17 +859,34 @@ const BookingSystem: React.FC = () => {
 
               <section className="space-y-3">
                 <h3 className="font-black text-slate-800 flex items-center gap-2 pb-2 border-b-2 border-slate-100"><Package size={17} className="text-orange-500"/> Order</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-100 text-center"><p className="text-xs font-bold text-orange-500 uppercase mb-1">Size</p><p className="text-2xl font-black text-orange-900">{viewingBooking.variant ?? '—'}</p></div>
-                  <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-100 text-center"><p className="text-xs font-bold text-orange-500 uppercase mb-1">Qty</p><p className="text-2xl font-black text-orange-900">{viewingBooking.quantity}<span className="text-sm ml-1 font-medium">pcs</span></p></div>
-                  <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-100 text-center"><p className="text-xs font-bold text-orange-500 uppercase mb-1">Total</p><p className="text-xl font-black text-orange-900">RM {viewingBooking.totalPrice.toFixed(2)}</p></div>
+                <div className="space-y-3">
+                  {(viewingBooking.items ?? []).map(item => (
+                    <div key={item.id} className="grid grid-cols-3 gap-3">
+                      <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-100 text-center">
+                        <p className="text-xs font-bold text-orange-500 uppercase mb-1">Size</p>
+                        <p className="text-2xl font-black text-orange-900">{item.variant}</p>
+                      </div>
+                      <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-100 text-center">
+                        <p className="text-xs font-bold text-orange-500 uppercase mb-1">Qty</p>
+                        <p className="text-2xl font-black text-orange-900">{item.quantity}<span className="text-sm ml-1 font-medium">pcs</span></p>
+                      </div>
+                      <div className="bg-orange-50 rounded-xl p-4 border-2 border-orange-100 text-center">
+                        <p className="text-xs font-bold text-orange-500 uppercase mb-1">Total</p>
+                        <p className="text-xl font-black text-orange-900">RM {item.totalPrice.toFixed(2)}</p>
+                      </div>
+                      {item.promoLabel && (
+                        <div className="col-span-3 flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                          <Tag size={14} className="text-emerald-600 shrink-0"/>
+                          <p className="text-sm font-bold text-emerald-800">Promo applied: {item.promoLabel}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                {viewingBooking.promoLabel && (
-                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-                    <Tag size={14} className="text-emerald-600 shrink-0"/>
-                    <p className="text-sm font-bold text-emerald-800">Promo applied: {viewingBooking.promoLabel}</p>
-                  </div>
-                )}
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-center justify-between">
+                  <p className="text-sm font-bold text-slate-600">Order total</p>
+                  <p className="text-xl font-black text-orange-900">RM {(viewingBooking.totalAmount ?? viewingBooking.totalPrice ?? 0).toFixed(2)}</p>
+                </div>
               </section>
 
               <section className="space-y-3">
