@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   Package, User, Phone, MapPin, CreditCard, Wallet, Clock,
-  CheckCircle, XCircle, Edit2, Trash2, Calendar, ShoppingCart,
+  CheckCircle, XCircle, Edit2, Trash2, ShoppingCart,
   AlertCircle, Search, Eye, X, Tag, Plus, Settings, DollarSign,
   RotateCcw
 } from 'lucide-react';
 import {
   collection, addDoc, getDocs, doc, updateDoc, deleteDoc,
-  Timestamp, query, orderBy
+  Timestamp
 } from "firebase/firestore";
 import { db } from '../firebaseConfig';
 
@@ -53,10 +53,12 @@ const OFFICIAL_VARIANTS: { id: VariantId; label: string; officialPrice: number }
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const defaultSettings = (): Record<VariantId, VariantSettings> =>
-  Object.fromEntries(
-    OFFICIAL_VARIANTS.map(v => [v.id, { basePrice: v.officialPrice, promos: [] }])
-  ) as Record<VariantId, VariantSettings>;
+
+const defaultSettings = (): Record<VariantId, VariantSettings> => ({
+  '80g':  { basePrice: 3.0,  promos: [] },
+  '500g': { basePrice: 15.0, promos: [] },
+  '1kg':  { basePrice: 22.0, promos: [] },
+});
 
 const loadSettings = (): Record<VariantId, VariantSettings> => {
   try {
